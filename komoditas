@@ -1,0 +1,568 @@
+
+import streamlit as st
+import pandas as pd
+import plotly.graph_objects as go
+
+# ============================================================
+# Dashboard Monitoring Komoditas - Python 3 + Streamlit
+# Converted from the supplied React/JSX application.
+# ============================================================
+
+st.set_page_config(
+    page_title="Dashboard Monitoring Komoditas",
+    page_icon="🌱",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
+
+# ---------- Theme / CSS ----------
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap');
+
+* { box-sizing: border-box; }
+html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
+.block-container { padding-top: 1.5rem; padding-bottom: 2rem; }
+
+.hero {
+    background: #F3F1EC;
+    border-radius: 14px;
+    padding: 42px 38px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+.hero h1 {
+    font-family: 'Fraunces', serif;
+    color: #1E2A22;
+    font-size: 30px;
+    margin-bottom: 8px;
+}
+.hero p { color: #5B6B60; font-size: 14px; }
+
+.card {
+    background: white;
+    border: 1.5px solid #E7E3D9;
+    border-radius: 12px;
+    padding: 20px 18px;
+    min-height: 175px;
+    margin-bottom: 10px;
+}
+.card-icon {
+    font-size: 25px;
+    margin-bottom: 12px;
+}
+.card-title {
+    font-family: 'Fraunces', serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: #1E2A22;
+    margin-bottom: 7px;
+}
+.card-text { font-size: 12px; color: #6B7A70; line-height: 1.5; }
+
+.kpi {
+    background: #153824;
+    border: 1px solid rgba(245,243,234,.09);
+    border-left: 4px solid var(--accent);
+    border-radius: 9px;
+    padding: 15px;
+    min-height: 105px;
+}
+.kpi-label { font-size: 11px; color: #9FB8A8; text-transform: uppercase; }
+.kpi-value { font-family: 'Fraunces', serif; color: #F5F3EA; font-size: 20px; font-weight: 600; margin-top: 7px; }
+.kpi-note { color: #9FB8A8; font-size: 11px; margin-top: 5px; }
+
+.panel {
+    background: #153824;
+    border: 1px solid rgba(245,243,234,.09);
+    border-radius: 10px;
+    padding: 18px;
+}
+.panel-title { color: #F5F3EA; font-size: 14px; font-weight: 600; }
+.panel-sub { color: #9FB8A8; font-size: 11.5px; margin-top: 2px; }
+
+.banner {
+    background: rgba(201,162,39,.10);
+    border: 1px solid rgba(201,162,39,.35);
+    color: #E7D28C;
+    font-size: 12.5px;
+    line-height: 1.6;
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 18px;
+}
+
+[data-testid="stSidebar"] {
+    background: #0B2216;
+}
+[data-testid="stSidebar"] * {
+    color: #F5F3EA;
+}
+[data-testid="stMetric"] {
+    background: #153824;
+    border-radius: 9px;
+    padding: 10px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+
+# ---------- Data ----------
+COMMODITIES = [
+    {"id": "padi", "label": "Padi", "icon": "🌾", "kind": "crop", "factor": 4.2,
+     "tint": "#7C934A",
+     "blurb": "Jelajahi data luas tanam, panen, produksi, dan produktivitas padi di seluruh Indonesia."},
+    {"id": "jagung", "label": "Jagung", "icon": "☀️", "kind": "crop", "factor": 2.6,
+     "tint": "#C9A227",
+     "blurb": "Analisis tren pertumbuhan, produksi, dan produktivitas jagung di berbagai wilayah."},
+    {"id": "kedelai", "label": "Kedelai", "icon": "🌱", "kind": "crop", "factor": 1,
+     "tint": "#6FBF73",
+     "blurb": "Dapatkan wawasan mendalam tentang data kedelai, termasuk luas tanam dan hasil panen."},
+    {"id": "kacang-tanah", "label": "Kacang Tanah", "icon": "🥜", "kind": "crop", "factor": 0.35,
+     "tint": "#A87C4F",
+     "blurb": "Lihat statistik penting kacang tanah dari luas lahan hingga total produksi per tahun."},
+    {"id": "kacang-hijau", "label": "Kacang Hijau", "icon": "🫘", "kind": "crop", "factor": 0.22,
+     "tint": "#8FAA4C",
+     "blurb": "Telusuri data historis dan terkini mengenai budidaya dan hasil panen kacang hijau."},
+    {"id": "ubi-jalar", "label": "Ubi Jalar", "icon": "🥕", "kind": "crop", "factor": 0.9,
+     "tint": "#C97B4A",
+     "blurb": "Analisis data ubi jalar, salah satu sumber karbohidrat penting di Indonesia."},
+    {"id": "ubi-kayu", "label": "Ubi Kayu", "icon": "🍃", "kind": "crop", "factor": 3.1,
+     "tint": "#4F9A5C",
+     "blurb": "Visualisasikan data produksi dan produktivitas ubi kayu sebagai komoditas pangan pokok."},
+    {"id": "ltt", "label": "LTT (Luas Tambah Tanam)", "icon": "📏", "kind": "crop", "factor": 1.6,
+     "tint": "#5C9A8B",
+     "blurb": "Pantau capaian luas tambah tanam lintas komoditas, per provinsi dan per musim."},
+    {"id": "akabi", "label": "Anggaran AKABI", "icon": "💰", "kind": "budget", "factor": None,
+     "tint": "#B08A2E",
+     "blurb": "Monitoring anggaran dan realisasi program Aneka Kacang dan Umbi (AKABI) per provinsi."},
+]
+
+BASE_PROVINCES = [
+    {"name": "Jawa Timur", "wilayah": "Jawa", "tanam": 61200, "panen": 58400, "produksi": 128900, "produktivitas": 2.21, "target": 96},
+    {"name": "Jawa Tengah", "wilayah": "Jawa", "tanam": 49700, "panen": 47100, "produksi": 101250, "produktivitas": 2.15, "target": 91},
+    {"name": "Jawa Barat", "wilayah": "Jawa", "tanam": 44300, "panen": 41800, "produksi": 92600, "produktivitas": 2.22, "target": 88},
+    {"name": "Nusa Tenggara Barat", "wilayah": "Bali & Nusra", "tanam": 38650, "panen": 36200, "produksi": 79400, "produktivitas": 2.19, "target": 83},
+    {"name": "Sumatera Utara", "wilayah": "Sumatera", "tanam": 27400, "panen": 25100, "produksi": 51300, "produktivitas": 2.04, "target": 77},
+    {"name": "Aceh", "wilayah": "Sumatera", "tanam": 21900, "panen": 20300, "produksi": 41700, "produktivitas": 2.05, "target": 74},
+    {"name": "Sulawesi Selatan", "wilayah": "Sulawesi", "tanam": 18200, "panen": 16850, "produksi": 34600, "produktivitas": 2.05, "target": 69},
+    {"name": "Lampung", "wilayah": "Sumatera", "tanam": 15100, "panen": 13900, "produksi": 27800, "produktivitas": 2.00, "target": 64},
+    {"name": "Yogyakarta", "wilayah": "Jawa", "tanam": 9800, "panen": 9200, "produksi": 19600, "produktivitas": 2.13, "target": 90},
+    {"name": "Nusa Tenggara Timur", "wilayah": "Bali & Nusra", "tanam": 12400, "panen": 11100, "produksi": 21300, "produktivitas": 1.92, "target": 58},
+    {"name": "Sulawesi Utara", "wilayah": "Sulawesi", "tanam": 7300, "panen": 6600, "produksi": 13100, "produktivitas": 1.98, "target": 61},
+    {"name": "Bali", "wilayah": "Bali & Nusra", "tanam": 4100, "panen": 3800, "produksi": 7900, "produktivitas": 2.08, "target": 82},
+]
+
+BASE_TREND = [
+    {"tahun": "2020", "tanam": 178400, "produksi": 296700},
+    {"tahun": "2021", "tanam": 201300, "produksi": 342100},
+    {"tahun": "2022", "tanam": 187600, "produksi": 318900},
+    {"tahun": "2023", "tanam": 154200, "produksi": 261800},
+    {"tahun": "2024", "tanam": 132900, "produksi": 226400},
+    {"tahun": "2025", "tanam": 141700, "produksi": 241300},
+    {"tahun": "2026", "tanam": 148300, "produksi": 251900},
+]
+
+BUDGET_PROVINCES = [
+    {"name": "Jawa Timur", "anggaran": 18500000000, "realisasi": 16800000000},
+    {"name": "Jawa Tengah", "anggaran": 15200000000, "realisasi": 14100000000},
+    {"name": "Jawa Barat", "anggaran": 13800000000, "realisasi": 11900000000},
+    {"name": "Nusa Tenggara Barat", "anggaran": 11400000000, "realisasi": 9600000000},
+    {"name": "Sumatera Utara", "anggaran": 8700000000, "realisasi": 6950000000},
+    {"name": "Aceh", "anggaran": 6900000000, "realisasi": 5450000000},
+    {"name": "Sulawesi Selatan", "anggaran": 5800000000, "realisasi": 4100000000},
+    {"name": "Lampung", "anggaran": 4950000000, "realisasi": 3700000000},
+    {"name": "Yogyakarta", "anggaran": 3100000000, "realisasi": 2850000000},
+    {"name": "Nusa Tenggara Timur", "anggaran": 3900000000, "realisasi": 2300000000},
+]
+
+BUDGET_TREND = [
+    {"tahun": "2021", "anggaran": 68000000000, "realisasi": 58900000000},
+    {"tahun": "2022", "anggaran": 74500000000, "realisasi": 64200000000},
+    {"tahun": "2023", "anggaran": 81200000000, "realisasi": 66700000000},
+    {"tahun": "2024", "anggaran": 79800000000, "realisasi": 61500000000},
+    {"tahun": "2025", "anggaran": 88300000000, "realisasi": 72400000000},
+    {"tahun": "2026", "anggaran": 92500000000, "realisasi": 77900000000},
+]
+
+PENGADAAN_STAGES_HA = [
+    ("skBrmp", "SK BRMP"),
+    ("skKpa", "SK KPA"),
+    ("skPpk", "SK PPK"),
+    ("kontrak", "Kontrak"),
+    ("salur", "Salur"),
+    ("tanam", "Tanam"),
+]
+PENGADAAN_STAGES_RP = [
+    ("klik", "Klik"),
+    ("nilaiKontrak", "Nilai Kontrak"),
+    ("spm", "SPM"),
+    ("sp2d", "SP2D"),
+]
+
+
+# ---------- Helpers ----------
+def fmt(n):
+    return f"{int(round(n)):,}".replace(",", ".")
+
+def fmt_rp(n):
+    if n is None:
+        return "—"
+    if n >= 1e9:
+        return f"Rp {n / 1e9:.1f} M"
+    if n >= 1e6:
+        return f"Rp {n / 1e6:.0f} Jt"
+    return f"Rp {fmt(n)}"
+
+def scale_provinces(factor):
+    rows = []
+    for p in BASE_PROVINCES:
+        q = p.copy()
+        q["tanam"] = round(p["tanam"] * factor)
+        q["panen"] = round(p["panen"] * factor)
+        q["produksi"] = round(p["produksi"] * factor)
+        rows.append(q)
+    return rows
+
+def scale_trend(factor):
+    rows = []
+    for t in BASE_TREND:
+        q = t.copy()
+        q["tanam"] = round(t["tanam"] * factor)
+        q["produksi"] = round(t["produksi"] * factor)
+        rows.append(q)
+    return rows
+
+def build_pengadaan_provinces(target_ha):
+    total_share = sum(p["tanam"] for p in BASE_PROVINCES)
+    rows = []
+    for p in BASE_PROVINCES:
+        rows.append({
+            "name": p["name"],
+            "targetHa": round((p["tanam"] / total_share) * target_ha),
+            "skBrmp": None, "skKpa": None, "skPpk": None,
+            "kontrak": None, "salur": None, "tanam": None,
+            "klik": None, "nilaiKontrak": None, "spm": None, "sp2d": None,
+        })
+    return rows
+
+def plot_line(df, x, series, names, title, money=False):
+    fig = go.Figure()
+    for col, name, dash in zip(series, names, ["solid", "solid"]):
+        fig.add_trace(go.Scatter(
+            x=df[x], y=df[col], mode="lines+markers",
+            name=name, line=dict(width=2.5),
+            marker=dict(size=6),
+        ))
+    fig.update_layout(
+        title=title,
+        height=300,
+        margin=dict(l=10, r=10, t=45, b=10),
+        paper_bgcolor="#153824",
+        plot_bgcolor="#153824",
+        font=dict(color="#F5F3EA"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.01),
+        xaxis=dict(gridcolor="rgba(245,243,234,.08)"),
+        yaxis=dict(gridcolor="rgba(245,243,234,.08)"),
+    )
+    if money:
+        fig.update_yaxes(tickformat=",.0s")
+    return fig
+
+def plot_bar(df, value_col, name_col, title, money=False):
+    d = df.sort_values(value_col, ascending=True).tail(5)
+    fig = go.Figure(go.Bar(
+        x=d[value_col],
+        y=d[name_col],
+        orientation="h",
+        text=d[value_col].map(fmt_rp if money else fmt),
+        textposition="outside",
+    ))
+    fig.update_layout(
+        title=title,
+        height=300,
+        margin=dict(l=10, r=60, t=45, b=10),
+        paper_bgcolor="#153824",
+        plot_bgcolor="#153824",
+        font=dict(color="#F5F3EA"),
+        xaxis=dict(gridcolor="rgba(245,243,234,.08)"),
+        yaxis=dict(gridcolor="rgba(245,243,234,.08)"),
+    )
+    return fig
+
+def kpi(label, value, note, accent):
+    st.markdown(
+        f"""<div class="kpi" style="--accent:{accent}">
+        <div class="kpi-label">{label}</div>
+        <div class="kpi-value">{value}</div>
+        <div class="kpi-note">{note}</div>
+        </div>""",
+        unsafe_allow_html=True,
+    )
+
+
+# ---------- Pages ----------
+def home():
+    st.markdown("""
+    <div class="hero">
+        <h1>Selamat datang</h1>
+        <p>Pilih dashboard monitoring untuk setiap poksi komoditas.</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+    cols = st.columns(4)
+    for i, c in enumerate(COMMODITIES):
+        with cols[i % 4]:
+            st.markdown(
+                f"""<div class="card">
+                <div class="card-icon">{c['icon']}</div>
+                <div class="card-title">Dashboard {c['label']}</div>
+                <div class="card-text">{c['blurb']}</div>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+            if st.button(f"Buka {c['label']}", key=f"open_{c['id']}", use_container_width=True):
+                st.session_state.commodity = c["id"]
+                st.session_state.page = "dashboard"
+                st.session_state.region = "Semua"
+                st.rerun()
+
+def sidebar(commodity):
+    with st.sidebar:
+        st.markdown(f"## {commodity['icon']} {commodity['label']}")
+        st.caption(f"Monitoring {'Anggaran' if commodity['kind'] == 'budget' else 'Komoditas'}")
+        if st.button("← Semua dashboard", use_container_width=True):
+            st.session_state.commodity = None
+            st.rerun()
+
+        pages = ["dashboard", "data"]
+        labels = ["📊 Dashboard", "📋 Data Wilayah"]
+        if commodity["kind"] == "crop":
+            pages.append("pengadaan")
+            labels.append("📦 Pengadaan")
+
+        current_index = pages.index(st.session_state.page) if st.session_state.page in pages else 0
+        selected = st.radio("Navigasi", labels, index=current_index)
+        st.session_state.page = pages[labels.index(selected)]
+
+        st.divider()
+        st.caption("Periode data")
+        st.write("Musim Tanam 2026")
+
+def crop_dashboard(commodity):
+    provinces = scale_provinces(commodity["factor"])
+    trend = scale_trend(commodity["factor"])
+
+    regions = ["Semua"] + sorted({p["wilayah"] for p in provinces})
+    if st.session_state.region not in regions:
+        st.session_state.region = "Semua"
+
+    region = st.selectbox("Wilayah", regions, index=regions.index(st.session_state.region))
+    st.session_state.region = region
+
+    filtered = provinces if region == "Semua" else [p for p in provinces if p["wilayah"] == region]
+
+    total_tanam = sum(p["tanam"] for p in filtered)
+    total_panen = sum(p["panen"] for p in filtered)
+    total_produksi = sum(p["produksi"] for p in filtered)
+    avg_prod = sum(p["produktivitas"] for p in filtered) / len(filtered) if filtered else 0
+    top5 = sorted(filtered, key=lambda p: p["produksi"], reverse=True)[:5]
+
+    st.title(f"Dashboard {commodity['label']}")
+    st.caption(f"Musim tanam 2026 · {len(filtered)} provinsi ditampilkan")
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: kpi("Total luas tanam", f"{fmt(total_tanam)} Ha", "Akumulasi wilayah terpilih", "#6FBF73")
+    with c2: kpi("Total luas panen", f"{fmt(total_panen)} Ha", "Capaian panen riil", "#C9A227")
+    with c3: kpi("Total produksi", f"{fmt(total_produksi)} Ton", "Akumulasi hasil panen", "#7FD1FF")
+    with c4: kpi("Rata-rata produktivitas", f"{avg_prod:.2f} Ton/Ha", "Provitas wilayah terpilih", "#E39A9A")
+
+    left, right = st.columns([1.3, 1])
+    with left:
+        st.markdown('<div class="panel"><div class="panel-title">Tren luas tanam vs produksi</div><div class="panel-sub">Nasional, 7 musim terakhir</div></div>', unsafe_allow_html=True)
+        dftrend = pd.DataFrame(trend)
+        st.plotly_chart(
+            plot_line(dftrend, "tahun", ["produksi", "tanam"], ["Produksi (ton)", "Luas tanam (ha)"], ""),
+            use_container_width=True
+        )
+    with right:
+        st.markdown('<div class="panel"><div class="panel-title">Peringkat produksi tertinggi</div><div class="panel-sub">Top 5 provinsi terpilih</div></div>', unsafe_allow_html=True)
+        dftop = pd.DataFrame(top5)
+        if not dftop.empty:
+            st.plotly_chart(plot_bar(dftop, "produksi", "name", ""), use_container_width=True)
+
+def budget_dashboard(commodity):
+    df = pd.DataFrame(BUDGET_PROVINCES)
+    total_anggaran = df["anggaran"].sum()
+    total_realisasi = df["realisasi"].sum()
+    serapan = total_realisasi / total_anggaran * 100
+    sisa = total_anggaran - total_realisasi
+
+    st.title(f"Dashboard {commodity['label']}")
+    st.caption(f"Tahun anggaran 2026 · {len(df)} provinsi ditampilkan")
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: kpi("Total anggaran", fmt_rp(total_anggaran), "Pagu program AKABI 2026", "#C9A227")
+    with c2: kpi("Total realisasi", fmt_rp(total_realisasi), "Terserap sampai saat ini", "#6FBF73")
+    with c3: kpi("Persentase serapan", f"{serapan:.1f}%", "Realisasi terhadap pagu", "#7FD1FF")
+    with c4: kpi("Sisa anggaran", fmt_rp(sisa), "Belum terealisasi", "#E39A9A")
+
+    left, right = st.columns([1.3, 1])
+    with left:
+        st.markdown('<div class="panel"><div class="panel-title">Tren anggaran vs realisasi</div><div class="panel-sub">Nasional, 2021–2026</div></div>', unsafe_allow_html=True)
+        dft = pd.DataFrame(BUDGET_TREND)
+        st.plotly_chart(
+            plot_line(dft, "tahun", ["anggaran", "realisasi"], ["Anggaran", "Realisasi"], "", money=True),
+            use_container_width=True
+        )
+    with right:
+        st.markdown('<div class="panel"><div class="panel-title">Realisasi tertinggi</div><div class="panel-sub">Top 5 provinsi</div></div>', unsafe_allow_html=True)
+        st.plotly_chart(plot_bar(df, "realisasi", "name", "", money=True), use_container_width=True)
+
+def crop_data_page(commodity):
+    provinces = scale_provinces(commodity["factor"])
+    df = pd.DataFrame(provinces)
+
+    st.title(f"Data wilayah — {commodity['label']}")
+
+    query = st.text_input("🔎 Cari provinsi...", key="crop_query")
+    if query:
+        df = df[df["name"].str.lower().str.contains(query.lower())]
+
+    sort_options = {
+        "Provinsi": "name",
+        "Pulau/Gugus": "wilayah",
+        "Luas tanam": "tanam",
+        "Luas panen": "panen",
+        "Produksi": "produksi",
+        "Produktivitas": "produktivitas",
+        "Capaian target": "target",
+    }
+    sort_label = st.selectbox("Urutkan berdasarkan", list(sort_options), index=4)
+    ascending = st.toggle("Urutan naik (ascending)", value=False)
+    df = df.sort_values(sort_options[sort_label], ascending=ascending)
+
+    st.caption(f"Rincian per provinsi · {len(df)} baris")
+
+    display = df.rename(columns={
+        "name": "Provinsi",
+        "wilayah": "Pulau/Gugus",
+        "tanam": "Luas tanam (Ha)",
+        "panen": "Luas panen (Ha)",
+        "produksi": "Produksi (Ton)",
+        "produktivitas": "Produktivitas (T/Ha)",
+        "target": "Capaian target (%)",
+    })[["Provinsi", "Pulau/Gugus", "Luas tanam (Ha)", "Luas panen (Ha)",
+        "Produksi (Ton)", "Produktivitas (T/Ha)", "Capaian target (%)"]]
+
+    st.dataframe(display, use_container_width=True, hide_index=True)
+
+def budget_data_page(commodity):
+    df = pd.DataFrame(BUDGET_PROVINCES)
+    st.title(f"Data wilayah — {commodity['label']}")
+
+    query = st.text_input("🔎 Cari provinsi...", key="budget_query")
+    if query:
+        df = df[df["name"].str.lower().str.contains(query.lower())]
+
+    df["serapan"] = (df["realisasi"] / df["anggaran"] * 100).round().astype(int)
+    df = df.sort_values("anggaran", ascending=False)
+    df["anggaran"] = df["anggaran"].map(fmt_rp)
+    df["realisasi"] = df["realisasi"].map(fmt_rp)
+    df = df.rename(columns={
+        "name": "Provinsi",
+        "anggaran": "Anggaran",
+        "realisasi": "Realisasi",
+        "serapan": "Serapan (%)",
+    })
+
+    st.caption(f"Rincian anggaran per provinsi · {len(df)} baris")
+    st.dataframe(df[["Provinsi", "Anggaran", "Realisasi", "Serapan (%)"]],
+                 use_container_width=True, hide_index=True)
+
+def procurement_page(commodity):
+    target_ha = 50000
+    target_rp = 50000000000
+    provinces = build_pengadaan_provinces(target_ha)
+    grand_target_ha = sum(p["targetHa"] for p in provinces)
+
+    st.title(f"Dashboard Pengadaan {commodity['label']}")
+    st.caption("TA 2026 · layout siap pakai, menunggu input dari tiap tim/poksi")
+
+    st.markdown("""
+    <div class="banner">
+    Halaman ini belum berisi data. Setiap tim mengisi bagiannya masing-masing lewat form input —
+    angka dan persentase di sini akan terisi otomatis begitu data masuk.
+    </div>
+    """, unsafe_allow_html=True)
+
+    c = st.columns(4)
+    with c[0]: kpi("Target (Ha)", fmt(grand_target_ha), "Alokasi rencana, sudah terisi", "#6FBF73")
+    for i, (_, label) in enumerate(PENGADAAN_STAGES_HA, start=1):
+        with c[i % 4]:
+            kpi(f"{label} (Ha)", "—", "Menunggu input tim", "#3E6B4C")
+
+    st.markdown("")
+    c = st.columns(4)
+    with c[0]: kpi("Target (Rp)", fmt_rp(target_rp), "Alokasi rencana, sudah terisi", "#C9A227")
+    for i, (_, label) in enumerate(PENGADAAN_STAGES_RP, start=1):
+        with c[i % 4]:
+            kpi(f"{label} (Rp)", "—", "Menunggu input tim", "#8A6F1D")
+
+    st.markdown("### Rincian per provinsi")
+    st.caption("Kolom tahap masih kosong — siap diisi oleh tim/poksi terkait")
+
+    rows = []
+    for i, p in enumerate(provinces, start=1):
+        rows.append({
+            "No": i,
+            "Provinsi": p["name"],
+            "Target (Ha)": fmt(p["targetHa"]),
+            "SK BRMP (Ha)": "—",
+            "SK KPA (Ha)": "—",
+            "SK PPK (Ha)": "—",
+            "Klik (Ha)": "—",
+            "Kontrak (Ha)": "—",
+            "Nilai Kontrak (Rp)": "—",
+            "SPM (Rp)": "—",
+            "SP2D (Rp)": "—",
+            "Salur (Ha)": "—",
+            "Tanam (Ha)": "—",
+        })
+    rows.append({
+        "No": "", "Provinsi": "Grand total", "Target (Ha)": fmt(grand_target_ha),
+        "SK BRMP (Ha)": "—", "SK KPA (Ha)": "—", "SK PPK (Ha)": "—",
+        "Klik (Ha)": "—", "Kontrak (Ha)": "—", "Nilai Kontrak (Rp)": "—",
+        "SPM (Rp)": "—", "SP2D (Rp)": "—", "Salur (Ha)": "—", "Tanam (Ha)": "—",
+    })
+    st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+
+
+# ---------- App ----------
+if "commodity" not in st.session_state:
+    st.session_state.commodity = None
+if "page" not in st.session_state:
+    st.session_state.page = "dashboard"
+if "region" not in st.session_state:
+    st.session_state.region = "Semua"
+
+if st.session_state.commodity is None:
+    home()
+else:
+    commodity = next(c for c in COMMODITIES if c["id"] == st.session_state.commodity)
+    sidebar(commodity)
+
+    if st.session_state.page == "dashboard":
+        if commodity["kind"] == "budget":
+            budget_dashboard(commodity)
+        else:
+            crop_dashboard(commodity)
+
+    elif st.session_state.page == "data":
+        if commodity["kind"] == "budget":
+            budget_data_page(commodity)
+        else:
+            crop_data_page(commodity)
+
+    elif st.session_state.page == "pengadaan" and commodity["kind"] == "crop":
+        procurement_page(commodity)
